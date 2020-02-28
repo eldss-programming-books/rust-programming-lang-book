@@ -9,12 +9,19 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new(args: &[String]) -> Result<Config, &'static str> {
-        if args.len() < 3 {
-            return Err("not enough arguments");
-        }
-        let query = args[1].clone();
-        let filename = args[2].clone();
+    pub fn new(mut args: env::Args) -> Result<Config, &'static str> {
+        // Skip program name
+        args.next();
+
+        let query = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a query string"),
+        };
+        let filename = match args.next() {
+            Some(arg) => arg,
+            None => return Err("Didn't get a file name"),
+        };
+
         let case_sensitive = env::var("CASE_INSENSITIVE").is_err();
 
         Ok(Config {
@@ -45,56 +52,25 @@ pub fn run(config: Config) -> Result<(), Box<dyn Error>> {
 }
 
 pub fn search<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
-    let mut results = Vec::new();
-
-    for line in contents.lines() {
-        if line.contains(query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.contains(query))
+        .collect()
 }
 
 pub fn search_case_insensitive<'a>(query: &str, contents: &'a str) -> Vec<&'a str> {
     let query = query.to_lowercase(); // now a String
-    let mut results = Vec::new();
-
-    for line in contents.lines() {
-        if line.to_lowercase().contains(&query) {
-            results.push(line);
-        }
-    }
-
-    results
+    contents
+        .lines()
+        .filter(|line| line.to_lowercase().contains(&query))
+        .collect()
 }
+
+// ========== Tests ==========
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn new_with_two_arguments() {
-        let program = String::from("testminigrep");
-        let query = String::from("the");
-        let file = String::from("test.txt");
-
-        let args = vec![program, query, file];
-        let config = Config::new(&args).unwrap();
-
-        assert_eq!("the", &config.query);
-        assert_eq!("test.txt", &config.filename);
-    }
-
-    #[test]
-    #[should_panic(expected = "not enough arguments")]
-    fn new_with_too_few_arguments() {
-        let program = String::from("testminigrep");
-        let query = String::from("the");
-
-        let args = vec![program, query];
-        Config::new(&args).unwrap();
-    }
 
     #[test]
     fn case_sensitive() {
